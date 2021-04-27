@@ -6,6 +6,7 @@ const Modal = {
         .classList
         .add('active')
     },
+
     close(){
         // fechar o modal
         // Remover a class active do modal
@@ -15,32 +16,22 @@ const Modal = {
     }
 } 
 
+const Storage = {
+    get() {
+        return JSON.parse(localStorage.getItem("dev.finances:transactions")) || []
+    },
+
+    set(transactions) {
+        localStorage.setItem("dev.finances:transactions", JSON.stringify(transactions))
+    }
+}
+
 const Transaction = {
-    all: [
-        {
-            description: 'Luz',
-            amount: -50001,
-            date: '23/01/2021',
-        }, 
-        {
-            description: 'website',
-            amount: 500000,
-            date: '23/01/2021',
-        },
-        {
-            description: 'Internet',
-            amount: -20012,
-            date: '23/01/2021',
-        }, 
-        {
-            description: 'App',
-            amount: 20000,
-            date: '23/01/2021',
-        },
-    ],
+    all: Storage.get(),
 
     add(transaction){
         Transaction.all.push(transaction)
+
         App.reload()
     },
 
@@ -64,6 +55,7 @@ const Transaction = {
         
         return income;
     }, 
+
     expenses (){
         let expense = 0;
         // pegar todas as transações
@@ -79,6 +71,7 @@ const Transaction = {
         
         return expense;
     },
+
     total() {
 
         return Transaction.incomes() + Transaction.expenses();
@@ -89,11 +82,13 @@ const DOM = {
     transactionsContainer: document.querySelector('#data-table tbody'), 
     addTransaction(transaction, index) {
         const tr = document.createElement('tr')
-        tr.innerHTML = DOM.innerHTMLTransaction(transaction)
+        tr.innerHTML = DOM.innerHTMLTransaction(transaction, index)
+        tr.dataset.index = index
         DOM.transactionsContainer.appendChild(tr)
         
     },
-    innerHTMLTransaction(transaction) {
+
+    innerHTMLTransaction(transaction, index) {
         const CSSclass = transaction.amount > 0 ? "income" : "expense"
 
         const amount = Utils.formatCurrency(transaction.amount)
@@ -103,11 +98,12 @@ const DOM = {
         <td class="${CSSclass}">${amount}</td>
         <td class="date">${transaction.date}</td>
         <td>
-            <img src="./assets/minus.svg" alt="Remover Transação">
+            <img onclick="Transaction.remove(${index})" src="./assets/minus.svg" alt="Remover Transação">
         </td>
         `
         return html
     },
+
     updateBalance(){
         document
             .getElementById('incomeDisplay')
@@ -132,8 +128,10 @@ const Utils = {
     },
 
     formatDate(date){
-        console.log(date)
+        const splittedDate = date.split("-")
+        return `${splittedDate[2]}/${splittedDate[1]}/${splittedDate[0]}`
     },
+
     formatCurrency(value){
         const signal = Number(value) < 0 ? "-" : ""
         value = String(value).replace(/\D/g, "")
@@ -173,6 +171,17 @@ const Form = {
         let {description, amount, date} = Form.getValues()
         amount = Utils.formatAmount(amount)
         date = Utils.formatDate(date)
+        return {
+            description,
+            amount,
+            date
+        }
+    },
+
+    clearFields() {
+        Form.description.value = ""
+        Form.amount.value = ""
+        Form.date.value = ""
     },
 
     submit(event) {
@@ -180,12 +189,15 @@ const Form = {
 
         try {
             // verificar se todas as informações foram preenchidas
-            //Form.validateFields()
+            Form.validateFields()
             // formatar os dados para salvar
-            Form.formatValues()
+            const transaction = Form.formatValues()
             // salvar
+            Transaction.add(transaction)
             // apagar o dados do formulario
+            Form.clearFields()
             // modal feche
+            Modal.close()
             // atualizar a aplicação
         } catch (error) {
             alert(error.message)
@@ -196,12 +208,11 @@ const Form = {
 
 const App = {
     init(){
-        Transaction.all.forEach(transaction => {
-            DOM.addTransaction(transaction)
-        })
-        
-        DOM.updateBalance()
-        
+            Transaction.all.forEach(DOM.addTransaction)
+            
+            DOM.updateBalance()
+    
+            Storage.set(Transaction.all)
         
     },
     reload() {
